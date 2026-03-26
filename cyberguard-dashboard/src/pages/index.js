@@ -9,7 +9,7 @@ import ThreatMap from '../components/ThreatMap';
 import LoginScreen from '../components/LoginScreen';
 import SimulationPanel from '../components/SimulationPanel';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://cyberguard-backend-qqb4.onrender.com';
+const API = 'https://cyberguard-backend-qqb4.onrender.com';
 
 const LEVEL_COLORS = {
   CRITICAL: '#ff4757',
