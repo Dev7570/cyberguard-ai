@@ -76,7 +76,7 @@ export default function Dashboard() {
       
       const [healthRes, statsRes, threatsRes, blockedIpsRes, blockedCountriesRes, settingsRes, analyticsRes] = await Promise.all([
         axios.get(`${API}/health`),
-        axios.get(`${API}/stats`),
+        axios.get(`${API}/stats`, authHeader),
         axios.get(`${API}/threats?limit=${filter === 'ALL' ? 100 : 50}${filter !== 'ALL' ? `&level=${filter}` : ''}`),
         axios.get(`${API}/blocked`, authHeader).catch(() => ({ data: { blocked_ips: [] } })),
         axios.get(`${API}/countries/blocked`, authHeader).catch(() => ({ data: [] })),
