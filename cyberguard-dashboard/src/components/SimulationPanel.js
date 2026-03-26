@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import s from '../styles/SimulationPanel.module.css';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://cyberguard-backend-qqb4.onrender.com';
+const API_URL = 'https://cyberguard-backend-qqb4.onrender.com';
 
 export default function SimulationPanel({ onSuccess, onError }) {
   const [attackType, setAttackType] = useState('DDoS');
