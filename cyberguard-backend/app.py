@@ -276,13 +276,20 @@ bg_thread.start()
 from collections import defaultdict
 
 _rate_store = defaultdict(list)  # ip -> [timestamps]
-RATE_LIMIT = 60        # max requests per window
+RATE_LIMIT = 300        # max requests per window
 RATE_WINDOW = 60       # window in seconds
 
 
 def rate_limit_check():
     """Check if the request IP is within rate limits. Call as @app.before_request."""
-    ip = request.remote_addr or '0.0.0.0'
+    if request.method == 'OPTIONS':
+        return None
+        
+    # Handle Proxy IPs (Render/Vercel)
+    ip = request.headers.get('X-Forward-For', request.remote_addr) or '0.0.0.0'
+    if ',' in ip:
+        ip = ip.split(',')[0].strip()
+        
     now = time.time()
     # Clean old entries
     _rate_store[ip] = [t for t in _rate_store[ip] if now - t < RATE_WINDOW]
@@ -626,6 +633,7 @@ def export_threats_pdf():
 
 
 @app.route('/stats', methods=['GET'])
+@token_required
 def get_stats():
     """Get aggregated threat statistics."""
     stats = db.get_threat_stats()
@@ -636,6 +644,7 @@ def get_stats():
 
 
 @app.route('/block', methods=['POST'])
+@token_required
 def block_ip_endpoint():
     """Block an IP address."""
     data = request.get_json()
@@ -675,6 +684,7 @@ def block_ip_endpoint():
 
 
 @app.route('/unblock', methods=['POST'])
+@token_required
 def unblock_ip_endpoint():
     """Unblock an IP address."""
     data = request.get_json()
@@ -742,12 +752,14 @@ def simulate_threat_endpoint():
 # ── Country-Level Blocking Endpoints ──────────────────────────────────
 
 @app.route('/countries/blocked', methods=['GET'])
+@token_required
 def get_blocked_countries():
     """Get all blocked countries."""
     return jsonify(db.get_blocked_countries()), 200
 
 
 @app.route('/countries/block', methods=['POST'])
+@token_required
 def block_country_endpoint():
     """Block a country by its code."""
     data = request.get_json()
@@ -769,6 +781,7 @@ def block_country_endpoint():
 
 
 @app.route('/countries/unblock', methods=['POST'])
+@token_required
 def unblock_country_endpoint():
     """Unblock a country."""
     data = request.get_json()
@@ -783,6 +796,7 @@ def unblock_country_endpoint():
 
 
 @app.route('/blocked', methods=['GET'])
+@token_required
 def get_blocked():
     """Get all blocked IPs with AI unblock recommendations."""
     blocked_ips = db.get_blocked_ips()
@@ -885,24 +899,28 @@ recovery_thread.start()
 
 
 @app.route('/network/interfaces', methods=['GET'])
+@token_required
 def get_interfaces():
     """List network interfaces."""
     return jsonify(get_network_interfaces()), 200
 
 
 @app.route('/network/stats', methods=['GET'])
+@token_required
 def get_net_stats():
     """Get system network statistics."""
     return jsonify(get_system_network_stats()), 200
 
 
 @app.route('/settings', methods=['GET'])
+@token_required
 def get_settings():
     """Get all settings."""
     return jsonify(db.get_all_settings()), 200
 
 
 @app.route('/settings', methods=['POST'])
+@token_required
 def update_settings():
     """Update system settings and handle mode changes."""
     data = request.get_json()
@@ -922,6 +940,7 @@ def update_settings():
 
 
 @app.route('/test-webhook', methods=['POST'])
+@token_required
 def test_webhook():
     """Send a test notification to the configured webhook."""
     webhook_url = db.get_setting('webhook_url')
@@ -948,6 +967,7 @@ def model_info():
 
 
 @app.route('/reset', methods=['POST'])
+@token_required
 def reset_data():
     """Reset all threat data and statistics."""
     processor.reset_stats()

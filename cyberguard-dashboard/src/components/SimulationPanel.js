@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import s from '../styles/SimulationPanel.module.css';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://cyberguard-backend-qqb4.onrender.com';
 
 export default function SimulationPanel({ onSuccess, onError }) {
   const [attackType, setAttackType] = useState('DDoS');
@@ -12,7 +12,7 @@ export default function SimulationPanel({ onSuccess, onError }) {
   const handleSimulate = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('cg_token');
+      const token = localStorage.getItem('cyberguard_token');
       await axios.post(
         `${API_URL}/simulate-threat`,
         { attack_type: attackType, target_ip: targetIp },

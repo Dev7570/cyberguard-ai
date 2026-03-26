@@ -590,7 +590,7 @@ export default function Dashboard() {
               className={s.filterBtn} 
               style={{ padding: '6px 16px', background: 'var(--surface-bg)' }}
               onClick={() => {
-                const token = localStorage.getItem('cg_token');
+                const token = localStorage.getItem('cyberguard_token');
                 window.open(`${API}/threats/report/pdf?token=${token}`, '_blank');
               }}
             >
@@ -652,7 +652,7 @@ export default function Dashboard() {
                     </td>
                     <td>
                       {t.threat_level !== 'NORMAL' && (
-                        <button className={s.blockBtn} onClick={() => blockIP(t.src_ip)}>
+                        <button className={s.blockBtn} onClick={() => handleBlock(t.src_ip)}>
                           Block
                         </button>
                       )}
@@ -728,7 +728,7 @@ export default function Dashboard() {
                         )}
                       </td>
                       <td>
-                        <button className={s.unblockBtn} onClick={() => unblockIP(b.ip)}>
+                        <button className={s.unblockBtn} onClick={() => handleUnblock(b.ip)}>
                           Unblock
                         </button>
                       </td>
@@ -766,13 +766,13 @@ export default function Dashboard() {
                     onChange={(e) => setWebhookUrl(e.target.value)}
                     placeholder="https://discord.com/api/webhooks/..."
                   />
-                  <button onClick={saveSettings} className={s.saveBtn}>Save</button>
+                  <button onClick={handleUpdateSettings} className={s.saveBtn}>Save</button>
                 </div>
                 <p className={s.helpText}>Notifications will be sent for critical threats and autonomous recovery.</p>
               </div>
               <div className={s.testSection}>
                 <button 
-                  onClick={testWebhook} 
+                  onClick={handleTestWebhook} 
                   disabled={isTestLoading || !webhookUrl}
                   className={s.testBtn}
                 >
