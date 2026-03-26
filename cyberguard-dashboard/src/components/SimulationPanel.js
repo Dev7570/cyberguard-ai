@@ -33,7 +33,7 @@ export default function SimulationPanel({ onSuccess, onError }) {
   return (
     <div className={s.panelCard}>
       <h3 className={s.panelTitle}>
-        <span style={{ color: '#ef4444' }}>⚠</span> Threat Simulation Engine
+        <span style={{ color: '#ef4444' }} role="img" aria-label="warning">⚠</span> Threat Simulation Engine
       </h3>
       <p className={s.panelDesc}>
         Inject synthetic malicious traffic into the live analysis queue. 

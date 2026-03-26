@@ -594,7 +594,7 @@ export default function Dashboard() {
                 window.open(`${API}/threats/report/pdf?token=${token}`, '_blank');
               }}
             >
-              📄 Export PDF
+              <span role="img" aria-label="document">📄</span> Export PDF
             </button>
           </div>
           <div className={s.filters}>
