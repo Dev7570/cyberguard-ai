@@ -1,0 +1,50 @@
+Γû▓ Next.js 16.2.1 (Turbopack)
+- Environments: .env.local, .env.production
+
+  Running TypeScript ...
+  Finished TypeScript in 94ms ...
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 2 errors:
+./src/components/LoginScreen.js:2:1
+Module not found: Can't resolve 'axios'
+  1 | import { useState, useEffect } from 'react';
+> 2 | import axios from 'axios';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 | import s from '@/styles/Login.module.css';
+  4 |
+  5 | const API = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+
+
+
+Import traces:
+  Browser:
+    ./src/components/LoginScreen.js
+    ./src/pages/index.js
+
+  SSR:
+    ./src/components/LoginScreen.js
+    ./src/pages/index.js
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/pages/index.js:2:1
+Module not found: Can't resolve 'axios'
+  1 | import { useEffect, useState, useCallback, useRef } from 'react';
+> 2 | import axios from 'axios';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 | import {
+  4 |   AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  5 |   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
+
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (./src/components/LoginScreen.js:2:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/pages/index.js:2:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)

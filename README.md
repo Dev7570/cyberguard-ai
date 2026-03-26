@@ -1,7 +1,7 @@
-# CyberGuard - AI: Real-Time Network Threat Intelligence Platform
+# CyberGuard-AI: Autonomous Network Threat Intelligence Platform
 
 <p align="center">
-  <strong>🛡️ ML-Powered Network Threat Detection & Visualization</strong>
+  <strong>🛡️ ML-Powered Threat Detection · Autonomous Recovery · Global Geo-Fencing · Real-Time Analytics</strong>
 </p>
 
 <p align="center">
@@ -13,6 +13,8 @@
   <img src="https://img.shields.io/badge/Next.js-14-black?logo=next.js&logoColor=white" />
   <img src="https://img.shields.io/badge/Flask-3.0-green?logo=flask&logoColor=white" />
   <img src="https://img.shields.io/badge/ML-scikit--learn-orange?logo=scikit-learn&logoColor=white" />
+  <img src="https://img.shields.io/badge/WebSocket-Socket.IO-purple?logo=socket.io&logoColor=white" />
+  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white" />
   <img src="https://img.shields.io/badge/License-MIT-yellow" />
 </p>
 
@@ -20,102 +22,129 @@
 
 ## Overview
 
-CyberGuard - AI is a production-ready network threat intelligence platform that combines **machine learning** with **rule-based heuristics** to detect and visualize network threats in real time.
+CyberGuard-AI is a **production-ready, autonomous** network threat intelligence platform that combines **dual ML engines** with **rule-based heuristics** to detect, visualize, and neutralize network threats in real time. Unlike traditional firewalls, CyberGuard-AI thinks for itself — autonomously blocking threats, recovering safe IPs, and alerting operators via webhooks.
 
-### Why This is Useful
+### What Makes This Different
 
-In modern networks, traditional signature-based firewalls often fail to catch zero-day attacks or slow, methodical intrusions. CyberGuard-AI solves this by:
-- **Identifying Anomalies Instantly:** Using Isolation Forests to detect traffic that behaves strangely, even if there's no known signature for it.
-- **Providing Immediate Actionability:** Visualizing raw packet streams into understandable metrics and top-attacker charts so you can make split-second decisions.
-- **Automating Defense:** Offering instant IP blocking capabilities and automated threat scoring to prioritize critical risks above all else.
+| Traditional Firewall | CyberGuard-AI |
+|---------------------|---------------|
+| Signature-based detection | ML anomaly detection (catches zero-day attacks) |
+| Manual rule management | Autonomous blocking & recovery with AI reasoning |
+| Static logs | Real-time dashboard with global threat map |
+| No geographical context | Country-level geo-fencing & Geo-IP mapping |
+| No proactive alerts | Instant Discord/Slack webhook notifications |
+| No export capability | One-click CSV forensic export |
 
-### Key Features
+---
 
-- **🤖 Dual ML Engine** — Random Forest classifier + Isolation Forest anomaly detector
-- **🔍 8 Attack Detectors** — SYN flood, port scan, brute force, DDoS, DNS amplification, Xmas/Null scans
-- **📊 Real-Time Dashboard** — Premium dark-themed UI with live charts, threat table, and top attackers
-- **🚫 IP Blocking** — One-click blocking with persistent blocklist
-- **🎭 Simulation Mode** — Generates realistic attack traffic for demo/development
-- **📡 Live Capture Mode** — Real network monitoring using psutil (no Npcap required)
-- **💾 SQLite Persistence** — Threat logs survive server restarts
-- **🔌 WebSocket** — Real-time push updates to connected dashboards
+## Features
+
+### 🤖 Dual ML Engine
+- **Random Forest** classifier trained on 15 engineered features for threat classification
+- **Isolation Forest** anomaly detector for zero-day attack identification
+- Combined threat scoring with heuristic boosting
+
+### 🔍 8 Attack Detectors
+SYN Flood · Port Scan · DDoS · Brute Force · DNS Amplification · Xmas Scan · Null Scan · Data Exfiltration
+
+### 🧠 AI-Driven Reasoning
+- Every blocked IP receives an AI-generated explanation (why it was blocked, confidence level)
+- Unblock recommendations for safe IPs with detailed reasoning
+
+### 🔄 Autonomous Recovery Loop
+- Background thread continuously evaluates blocked IPs
+- Auto-unblocks IPs with low threat history after a cooldown period
+- Sends webhook alerts when IPs are recovered
+
+### 🌍 Global Geo-IP Threat Map
+- Real-time SVG world map with pulsing threat markers
+- IP geolocation via ipapi.co (country, city, coordinates)
+- Hover tooltips with detailed location info
+
+### 🛡️ Country-Level Geo-Fencing
+- Block entire countries from the dashboard
+- Packets from banned regions are intercepted before ML analysis
+- Geo-fence violations trigger instant webhook alerts
+
+### 🔔 Instant Webhook Notifications
+- Discord/Slack-compatible rich embeds for every critical event
+- Configurable webhook URL via the Settings modal
+- Test button for verifying connectivity
+
+### 📊 24h Threat Analytics
+- Summary badges with color-coded severity breakdown
+- Hourly trend chart (AreaChart with critical overlay)
+- Top attack types ranking
+- One-click CSV export for forensic reporting
+
+### 📡 Real-Time Architecture
+- WebSocket push updates via Socket.IO
+- Live threat table with severity filtering
+- Pause/Resume controls for monitoring
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────┐     HTTP/WS      ┌──────────────────┐
-│                 │ ◄──────────────── │                  │
-│   ML Backend    │                   │  Next.js         │
-│   (Flask)       │ ──────────────►   │  Dashboard       │
-│                 │   JSON Threats    │                  │
-├─────────────────┤                   └──────────────────┘
-│ Network Monitor │                        :3000
-│ ML Model (RF)   │
-│ Isolation Forest│
-│ Heuristic Rules │
-│ SQLite DB       │
-└─────────────────┘
-      :5000
+┌──────────────────────────────────────────────────────┐
+│                   NEXT.JS DASHBOARD (:3000)          │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐  │
+│  │ Analytics │ │ Threat   │ │ Geo-IP   │ │Security│  │
+│  │ Charts   │ │ Table    │ │ Map      │ │ Rules  │  │
+│  └──────────┘ └──────────┘ └──────────┘ └────────┘  │
+└─────────────────────┬────────────────────────────────┘
+                      │ HTTP / WebSocket
+┌─────────────────────▼────────────────────────────────┐
+│                FLASK BACKEND (:5000)                  │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐  │
+│  │ ML Model │ │ Packet   │ │ Geo-IP   │ │Webhook │  │
+│  │ (RF+IF)  │ │Processor │ │ Resolver │ │ Engine │  │
+│  └──────────┘ └──────────┘ └──────────┘ └────────┘  │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐             │
+│  │ Network  │ │ SQLite   │ │ Recovery │             │
+│  │ Monitor  │ │ Database │ │ Loop     │             │
+│  └──────────┘ └──────────┘ └──────────┘             │
+└──────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Quick Start (Native — No Docker)
+## Quick Start
 
 ### Prerequisites
-
 - **Python 3.10+** — [python.org](https://python.org)
 - **Node.js 18+** — [nodejs.org](https://nodejs.org)
-- **VS Code** — recommended IDE
 
-### 1. Clone & Setup Backend
+### 1. Backend
 
 ```bash
 cd cyberguard-ai/cyberguard-backend
 
-# Create virtual environment
+# Create & activate venv
 python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS/Linux
 
-# Activate it (Windows)
-venv\Scripts\activate
-
-# Install dependencies
+# Install & run
 pip install -r requirements.txt
-
-# Start the backend
 python app.py
 ```
 
-You should see:
-```
-Model trained — accuracy: 0.95+
-CyberGuard-AI backend starting on port 5000
-Simulated network monitor started
-```
-
-### 2. Setup Dashboard
-
-Open a **new terminal** in VS Code (Ctrl+Shift+`):
+### 2. Dashboard
 
 ```bash
 cd cyberguard-ai/cyberguard-dashboard
-
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
 ```
 
-### 3. Open the Dashboard
-
-Navigate to **http://localhost:3000** in your browser. The dashboard will automatically connect to the backend and display real-time threat data.
+### 3. Open
+Navigate to **http://localhost:3000** — the dashboard auto-connects to the backend.
 
 ---
 
-## Quick Start (Docker)
+## Docker Quick Start
 
 ```bash
 cd cyberguard-ai
@@ -129,6 +158,8 @@ docker-compose up --build
 
 ## API Reference
 
+### Core Endpoints
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/health` | Health check & system status |
@@ -137,21 +168,33 @@ docker-compose up --build
 | `POST` | `/predict` | Analyze packets (JSON array) |
 | `POST` | `/block` | Block an IP `{"ip": "x.x.x.x"}` |
 | `POST` | `/unblock` | Unblock an IP |
-| `GET` | `/blocked` | List all blocked IPs |
-| `GET` | `/network/interfaces` | List network interfaces |
-| `GET` | `/network/stats` | System network counters |
+| `GET` | `/blocked` | Blocked IPs with AI recommendations |
+
+### Analytics & Export
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/threats/history?hours=24` | Paginated threat history |
+| `GET` | `/threats/summary` | 24h aggregated analytics |
+| `GET` | `/threats/export?hours=24` | Download CSV report |
+
+### Country-Level Blocking
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/countries/blocked` | List blocked countries |
+| `POST` | `/countries/block` | Block a country `{"country_code": "CN", "country_name": "China"}` |
+| `POST` | `/countries/unblock` | Unblock a country |
+
+### System
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | `GET` | `/settings` | Get all settings |
-| `POST` | `/settings` | Update settings |
-| `GET` | `/model/info` | ML model details & feature importance |
+| `POST` | `/settings` | Update settings (webhook_url, simulation_mode, etc.) |
+| `POST` | `/test-webhook` | Send a test webhook notification |
 | `POST` | `/reset` | Clear all threat data |
-
-### Example: Send Test Packets
-
-```bash
-curl -X POST http://127.0.0.1:5000/predict ^
-  -H "Content-Type: application/json" ^
-  -d "[{\"src_ip\":\"45.227.255.200\",\"dst_ip\":\"192.168.1.10\",\"src_port\":54321,\"dst_port\":22,\"protocol\":\"TCP\",\"packet_size\":200,\"flags\":2,\"timestamp\":\"2025-01-01T00:00:00\"}]"
-```
+| `GET` | `/model/info` | ML model details & feature importance |
 
 ---
 
@@ -160,16 +203,17 @@ curl -X POST http://127.0.0.1:5000/predict ^
 ```
 cyberguard-ai/
 ├── cyberguard-backend/
-│   ├── app.py              # Flask API + WebSocket server
+│   ├── app.py              # Flask API + WebSocket + Recovery Loop
 │   ├── ml_model.py         # Random Forest + Isolation Forest
 │   ├── data_processor.py   # Feature extraction + heuristic rules
 │   ├── network_monitor.py  # Simulated & live network capture
-│   ├── database.py         # SQLite persistence layer
+│   ├── database.py         # SQLite persistence + analytics queries
 │   ├── requirements.txt    # Python dependencies
 │   └── Dockerfile
 ├── cyberguard-dashboard/
-│   ├── src/pages/index.js  # Main dashboard page
-│   ├── src/styles/         # CSS design system
+│   ├── src/pages/index.js  # Main dashboard (Analytics, Map, Rules)
+│   ├── src/components/     # ThreatMap, ChartTooltip components
+│   ├── src/styles/         # Cyberpunk CSS design system
 │   ├── .env.local          # API URL config
 │   └── Dockerfile
 ├── docker-compose.yml
@@ -180,19 +224,17 @@ cyberguard-ai/
 
 ## ML Model Details
 
-### Features (15 dimensions)
+### Feature Engineering (15 dimensions)
 
 | # | Feature | Description |
 |---|---------|-------------|
 | 0 | src_port | Source port number |
 | 1 | dst_port | Destination port number |
 | 2 | packet_size | Packet size in bytes |
-| 3 | is_tcp | TCP protocol flag |
-| 4 | is_udp | UDP protocol flag |
-| 5 | is_icmp | ICMP protocol flag |
+| 3-5 | is_tcp/udp/icmp | Protocol one-hot flags |
 | 6 | tcp_flags | Raw TCP flag value |
-| 7 | packets_per_sec | Cumulative packets/sec from source |
-| 8 | bytes_per_sec | Cumulative bytes/sec from source |
+| 7 | packets_per_sec | Cumulative rate from source |
+| 8 | bytes_per_sec | Cumulative bandwidth from source |
 | 9 | unique_dst_ports | Unique destination ports seen |
 | 10 | port_diversity | Port diversity ratio |
 | 11 | syn_ratio | SYN packet ratio |
@@ -200,15 +242,15 @@ cyberguard-ai/
 | 13 | port_entropy | Shannon entropy of ports |
 | 14 | suspicious_port | Known suspicious port flag |
 
-### Attack Detection
+### Attack Detection Matrix
 
-| Attack Type | Detection Method | Heuristic Score |
-|------------|-----------------|-----------------|
-| SYN Flood | High SYN ratio (>80%) | +45 |
-| Port Scan | High port diversity (>0.6) | +35 |
-| DDoS | High pps (>100/sec) | +40 |
+| Attack Type | Detection Method | Score Boost |
+|------------|-----------------|-------------|
+| SYN Flood | SYN ratio > 80% | +45 |
+| Port Scan | Port diversity > 0.6 | +35 |
+| DDoS | Rate > 100 pps | +40 |
 | Brute Force | Repeated auth port access | +30 |
-| DNS Amplification | Large DNS responses (>512B) | +40 |
+| DNS Amplification | DNS response > 512B | +40 |
 | Xmas Scan | FIN+PSH+URG flags | +35 |
 | Null Scan | Zero TCP flags | +30 |
 
@@ -220,9 +262,9 @@ cyberguard-ai/
 |---------|----------|
 | `venv\Scripts\activate` fails | Run `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` |
 | Port 5000 in use | Change `PORT=5001` in app.py and update `.env.local` |
-| CORS errors in browser | Verify `CORS(app)` is in app.py after `Flask(__name__)` |
-| Dashboard shows "Disconnected" | Ensure Flask backend is running on port 5000 |
-| `ModuleNotFoundError` | Ensure `(venv)` is active before running `python app.py` |
+| CORS errors in browser | Verify `CORS(app)` is in app.py |
+| Dashboard shows "Disconnected" | Ensure backend is running on port 5000 |
+| `ModuleNotFoundError` | Ensure `(venv)` is active before running |
 
 ---
 

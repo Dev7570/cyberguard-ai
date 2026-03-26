@@ -5,6 +5,9 @@ import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 import s from '@/styles/Dashboard.module.css';
+import ThreatMap from '../components/ThreatMap';
+import LoginScreen from '../components/LoginScreen';
+import SimulationPanel from '../components/SimulationPanel';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
 
@@ -37,8 +40,19 @@ function ChartTooltip({ active, payload, label }) {
 
 // ── Main Dashboard ──────────────────────────────────────
 export default function Dashboard() {
+  const [token, setToken] = useState(null);
+  const [user, setUser] = useState(null);
+
   const [threats, setThreats] = useState([]);
   const [stats, setStats] = useState(null);
+  const [blockedIps, setBlockedIps] = useState([]);
+  const [blockedCountries, setBlockedCountries] = useState([]);
+  const [newCountryCode, setNewCountryCode] = useState('');
+  const [newCountryName, setNewCountryName] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [isTestLoading, setIsTestLoading] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [timeline, setTimeline] = useState([]);
   const [filter, setFilter] = useState('ALL');
   const [alert, setAlert] = useState('');
@@ -47,17 +61,36 @@ export default function Dashboard() {
   const [isPaused, setIsPaused] = useState(false);
   const pollRef = useRef(null);
 
+  const getAuthHeaders = useCallback(() => ({
+    headers: { Authorization: `Bearer ${token}` }
+  }), [token]);
+
+  const showAlert = useCallback((message) => {
+    setAlert(message);
+    setTimeout(() => setAlert(''), 4000);
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
-      const [threatRes, statsRes] = await Promise.all([
-        axios.get(`${API}/threats`, { params: { limit: 80 }, timeout: 5000 }),
-        axios.get(`${API}/stats`, { timeout: 5000 }),
+      const authHeader = getAuthHeaders();
+      
+      const [healthRes, statsRes, threatsRes, blockedIpsRes, blockedCountriesRes, settingsRes, analyticsRes] = await Promise.all([
+        axios.get(`${API}/health`),
+        axios.get(`${API}/stats`),
+        axios.get(`${API}/threats?limit=${filter === 'ALL' ? 100 : 50}${filter !== 'ALL' ? `&level=${filter}` : ''}`),
+        axios.get(`${API}/blocked`, authHeader).catch(() => ({ data: { blocked_ips: [] } })),
+        axios.get(`${API}/countries/blocked`, authHeader).catch(() => ({ data: [] })),
+        axios.get(`${API}/settings`, authHeader).catch(() => ({ data: {} })),
+        axios.get(`${API}/threats/summary`).catch(() => ({ data: null }))
       ]);
 
-      setThreats(threatRes.data);
+      setConnected(healthRes.status === 200);
       setStats(statsRes.data);
-      setConnected(true);
-      setLoading(false);
+      setThreats(threatsRes.data);
+      setBlockedIps(blockedIpsRes.data.blocked_ips || []);
+      setBlockedCountries(blockedCountriesRes.data);
+      setWebhookUrl(settingsRes.data.webhook_url || '');
+      setAnalyticsData(analyticsRes.data);
 
       // Build timeline data from stats
       if (statsRes.data.timeline && statsRes.data.timeline.length > 0) {
@@ -71,19 +104,42 @@ export default function Dashboard() {
         // Fallback: accumulate from polls
         setTimeline(prev => {
           const now = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-          const critCount = threatRes.data.filter(t => t.threat_level === 'CRITICAL').length;
-          const highCount = threatRes.data.filter(t => t.threat_level === 'HIGH').length;
-          const next = [...prev, { time: now, critical: critCount, high: highCount, total: threatRes.data.length }];
+          const critCount = threatsRes.data.filter(t => t.threat_level === 'CRITICAL').length;
+          const highCount = threatsRes.data.filter(t => t.threat_level === 'HIGH').length;
+          const next = [...prev, { time: now, critical: critCount, high: highCount, total: threatsRes.data.length }];
           return next.slice(-25);
         });
       }
     } catch (err) {
+      console.error("Failed to fetch data:", err);
       setConnected(false);
+    } finally {
       setLoading(false);
+    }
+  }, [filter, getAuthHeaders]);
+
+  useEffect(() => {
+    // Check local storage for auth token
+    const storedToken = localStorage.getItem('cyberguard_token');
+    const storedUser = localStorage.getItem('cyberguard_user');
+    if (storedToken && storedUser) {
+      setToken(storedToken);
+      setUser(storedUser);
+    } else {
+      setLoading(false); // Stop loading if no token
     }
   }, []);
 
   useEffect(() => {
+    if (!token) return;
+    
+    fetchData();
+    const analyticsInterval = setInterval(fetchData, 30000); // Use fetchData for analytics too
+    return () => clearInterval(analyticsInterval);
+  }, [token, fetchData]);
+
+  useEffect(() => {
+    if (!token) return; // Only poll if authenticated
     if (isPaused) {
       if (pollRef.current) clearInterval(pollRef.current);
       return;
@@ -91,29 +147,117 @@ export default function Dashboard() {
     fetchData();
     pollRef.current = setInterval(fetchData, 4000);
     return () => clearInterval(pollRef.current);
-  }, [fetchData, isPaused]);
+  }, [fetchData, isPaused, token]);
 
-  const blockIP = async (ip) => {
+  // ── Handlers ──────────────────────────────────────────
+  const handleLogin = (jwt, username) => {
+    localStorage.setItem('cyberguard_token', jwt);
+    localStorage.setItem('cyberguard_user', username);
+    setToken(jwt);
+    setUser(username);
+    setLoading(true); // Restart loading for dashboard
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('cyberguard_token');
+    localStorage.removeItem('cyberguard_user');
+    setToken(null);
+    setUser(null);
+    setLoading(false); // Ensure loading is false after logout
+  };
+
+  const handleBlock = async (ip) => {
     try {
-      await axios.post(`${API}/block`, { ip });
-      setAlert(`Blocked IP: ${ip}`);
-      setTimeout(() => setAlert(''), 4000);
+      await axios.post(`${API}/block`, { ip, reason: 'Manual block from dashboard' }, getAuthHeaders());
+      showAlert(`Blocked IP: ${ip}`);
       fetchData();
-    } catch { /* ignore */ }
+    } catch (err) { showAlert(err.response?.data?.error || 'Failed to block IP'); }
+  };
+
+  const handleUnblock = async (ip) => {
+    try {
+      await axios.post(`${API}/unblock`, { ip }, getAuthHeaders());
+      showAlert(`Unblocked IP: ${ip}`);
+      fetchData();
+    } catch (err) { showAlert('Failed to unblock IP'); }
+  };
+
+  const toggleMonitorMode = async () => {
+    try {
+      const currentMode = stats?.monitor?.type === 'simulated';
+      await axios.post(`${API}/settings`, { simulation_mode: !currentMode }, getAuthHeaders());
+      showAlert(`Switching to ${!currentMode ? 'Simulation' : 'Live Capture'} mode...`);
+      fetchData();
+    } catch (err) { showAlert('Failed to toggle monitor mode.'); }
+  };
+
+  const handleUpdateSettings = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/settings`, { webhook_url: webhookUrl }, getAuthHeaders());
+      showAlert('Settings saved successfully!');
+    } catch (err) {
+      showAlert('Failed to save settings.');
+    }
+  };
+
+  const handleTestWebhook = async () => {
+    if (!webhookUrl) return showAlert('Please enter a webhook URL first');
+    setIsTestLoading(true);
+    try {
+      await axios.post(`${API}/test-webhook`, {}, getAuthHeaders());
+      showAlert('Test webhook sent! Check your channel.');
+    } catch (err) {
+      showAlert('Failed to send test webhook. Check the URL and server logs.');
+    } finally {
+      setIsTestLoading(false);
+    }
+  };
+
+  const handleBlockCountry = async () => {
+    if (!newCountryCode) return;
+    try {
+      await axios.post(`${API}/countries/block`, {
+        country_code: newCountryCode.toUpperCase(),
+        country_name: newCountryName || newCountryCode.toUpperCase()
+      }, getAuthHeaders());
+      showAlert(`Country blocked: ${newCountryName || newCountryCode}`);
+      setNewCountryCode('');
+      setNewCountryName('');
+      fetchData();
+    } catch (err) { showAlert(err.response?.data?.error || 'Failed to block country'); }
+  };
+
+  const handleUnblockCountry = async (code) => {
+    try {
+      await axios.post(`${API}/countries/unblock`, { country_code: code }, getAuthHeaders());
+      showAlert(`Country unblocked: ${code}`);
+      fetchData();
+    } catch (err) { showAlert('Failed to unblock country'); }
   };
 
   const resetData = async () => {
     try {
-      await axios.post(`${API}/reset`);
+      await axios.post(`${API}/reset`, {}, getAuthHeaders());
       setThreats([]);
+      setBlockedIps([]);
       setTimeline([]);
       setFilter('ALL');
-      setAlert('All threat logs and counters have been reset');
-      setTimeout(() => setAlert(''), 4000);
-      // Let the natural poll refresh data on the next cycle or manually refresh
+      showAlert('All threat logs and counters have been reset');
       fetchData();
-    } catch { /* ignore */ }
+    } catch (err) { showAlert('Failed to reset data.'); }
   };
+
+  const handleExport = () => {
+    window.location.href = `${API}/threats/export?hours=24`;
+  };
+
+  if (!token) {
+    if (loading) return <div className={s.loading}>Initializing Authentication...</div>;
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  if (loading) return <div className={s.loading}>Initializing Global Node...</div>;
 
   // ── Derived Data ────────────────────────────────────
   const filtered = filter === 'ALL'
@@ -160,13 +304,21 @@ export default function Dashboard() {
               ↻ Reset Data
             </button>
           </div>
-          <span className={s.monitorBadge}>
+          <div className={`${s.monitorToggle} ${stats?.monitor?.type === 'simulated' ? '' : s.liveActive}`} onClick={toggleMonitorMode} title="Click to switch monitor mode">
             {stats?.monitor?.type === 'simulated' ? '◉ Simulation' : '◉ Live Capture'}
-          </span>
-          <div className={s.statusIndicator}>
-            <span className={`${s.statusDot} ${connected ? s.online : s.offline}`} />
-            {connected ? 'Backend Online' : 'Disconnected'}
           </div>
+          <div className={`${s.statusBadge} ${connected ? s.connected : s.disconnected}`}>
+            {connected ? '● LIVE' : '○ OFFLINE'}
+          </div>
+          <div className={s.userBadge}>
+            <span role="img" aria-label="user">👤</span> {user}
+          </div>
+          <button className={s.iconBtn} onClick={() => setIsSettingsOpen(true)} title="Settings">
+            ⚙️
+          </button>
+          <button className={s.logoutBtn} onClick={handleLogout} title="Logout">
+            ⏻
+          </button>
         </div>
       </header>
 
@@ -293,17 +445,158 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <ThreatMap blockedIps={blockedIps} />
+
+      {/* Analytics Section */}
+      <div className={s.tableCard}>
+        <div className={s.tableHeader}>
+          <span className={s.tableTitle}>📊 24h Threat Analytics</span>
+          <a 
+            href={`${API}/threats/export?hours=24`} 
+            className={s.exportBtn}
+            download
+          >
+            ⬇ Export CSV
+          </a>
+        </div>
+        <div className={s.analyticsContent}>
+          {/* Summary Badges */}
+          <div className={s.analyticsBadges}>
+            <div className={s.analyticsBadge}>
+              <span className={s.badgeValue}>{analyticsData?.total_24h || 0}</span>
+              <span className={s.badgeLabel}>Total Packets</span>
+            </div>
+            <div className={`${s.analyticsBadge} ${s.criticalBadge}`}>
+              <span className={s.badgeValue}>{analyticsData?.by_level?.CRITICAL || 0}</span>
+              <span className={s.badgeLabel}>Critical</span>
+            </div>
+            <div className={`${s.analyticsBadge} ${s.highBadge}`}>
+              <span className={s.badgeValue}>{analyticsData?.by_level?.HIGH || 0}</span>
+              <span className={s.badgeLabel}>High</span>
+            </div>
+            <div className={`${s.analyticsBadge} ${s.mediumBadge}`}>
+              <span className={s.badgeValue}>{analyticsData?.by_level?.MEDIUM || 0}</span>
+              <span className={s.badgeLabel}>Medium</span>
+            </div>
+            <div className={`${s.analyticsBadge} ${s.normalBadge}`}>
+              <span className={s.badgeValue}>{analyticsData?.by_level?.NORMAL || 0}</span>
+              <span className={s.badgeLabel}>Normal</span>
+            </div>
+          </div>
+
+          {/* Hourly Trend + Top Attacks */}
+          <div className={s.analyticsGrid}>
+            <div className={s.analyticsChart}>
+              <div className={s.chartTitle}>Hourly Threat Volume</div>
+              {analyticsData?.hourly_trend?.length > 0 ? (
+                <ResponsiveContainer width="100%" height={160}>
+                  <AreaChart data={analyticsData.hourly_trend}>
+                    <defs>
+                      <linearGradient id="colorAnalytics" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1c2245" />
+                    <XAxis dataKey="hour" tick={{ fill: '#8b92b0', fontSize: 10 }} />
+                    <YAxis tick={{ fill: '#8b92b0', fontSize: 10 }} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Area type="monotone" dataKey="total" stroke="#3b82f6" fillOpacity={1} fill="url(#colorAnalytics)" name="Total" />
+                    <Area type="monotone" dataKey="critical" stroke="#ff4757" fillOpacity={0} name="Critical" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className={s.emptyState}>Collecting data...</div>
+              )}
+            </div>
+            <div className={s.topAttacks}>
+              <div className={s.chartTitle}>Top Attack Types</div>
+              {analyticsData?.top_attacks?.length > 0 ? (
+                <ul className={s.attackersList}>
+                  {analyticsData.top_attacks.map((a, i) => (
+                    <li key={i} className={s.attackerItem}>
+                      <span className={s.attackerIp}>{a.attack_type}</span>
+                      <span className={s.attackerCount}>{a.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className={s.emptyState}>No attacks detected</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Security Rules - Country Blocking */}
+      <div className={s.tableCard}>
+        <div className={s.tableHeader}>
+          <span className={s.tableTitle}>🌍 Security Rules — Country Blocking</span>
+        </div>
+        <div className={s.rulesContent}>
+          <div className={s.addRuleRow}>
+            <input
+              type="text"
+              className={s.settingsInput}
+              placeholder="Country Code (e.g. CN)"
+              value={newCountryCode}
+              onChange={(e) => setNewCountryCode(e.target.value)}
+              maxLength={2}
+              style={{ maxWidth: 160 }}
+            />
+            <input
+              type="text"
+              className={s.settingsInput}
+              placeholder="Country Name (e.g. China)"
+              value={newCountryName}
+              onChange={(e) => setNewCountryName(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button className={s.blockCountryBtn} onClick={handleBlockCountry} disabled={!newCountryCode}>
+              Block Country
+            </button>
+          </div>
+          {blockedCountries.length > 0 ? (
+            <div className={s.countryBadges}>
+              {blockedCountries.map((c) => (
+                <div key={c.country_code} className={s.countryBadge}>
+                  <span className={s.countryFlag}>{c.country_code}</span>
+                  <span className={s.countryName}>{c.country_name}</span>
+                  <button className={s.removeCountryBtn} onClick={() => handleUnblockCountry(c.country_code)}>&times;</button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className={s.helpText} style={{ textAlign: 'center', padding: 16 }}>No country rules active. Add a country code above to auto-block all traffic from that region.</p>
+          )}
+        </div>
+      </div>
+
+      <SimulationPanel onSuccess={showAlert} />
+
       {/* Threat Table */}
       <div className={s.tableCard}>
         <div className={s.tableHeader}>
-          <span className={s.tableTitle}>
-            Live Threat Log
-            {filtered.length > 0 && (
-              <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>
-                ({filtered.length})
-              </span>
-            )}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span className={s.tableTitle}>
+              Live Threat Log
+              {filtered.length > 0 && (
+                <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>
+                  ({filtered.length})
+                </span>
+              )}
+            </span>
+            <button 
+              className={s.filterBtn} 
+              style={{ padding: '6px 16px', background: 'var(--surface-bg)' }}
+              onClick={() => {
+                const token = localStorage.getItem('cg_token');
+                window.open(`${API}/threats/report/pdf?token=${token}`, '_blank');
+              }}
+            >
+              📄 Export PDF
+            </button>
+          </div>
           <div className={s.filters}>
             {['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'NORMAL'].map(level => (
               <button
@@ -372,11 +665,124 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Blocked IPs Table */}
+      <div className={s.tableCard} style={{ marginTop: '24px' }}>
+        <div className={s.tableHeader} style={{ background: 'rgba(255, 71, 87, 0.05)' }}>
+          <span className={s.tableTitle} style={{ color: 'var(--accent-red)' }}>
+            Blocked Threat Management
+            {blockedIps.length > 0 && (
+              <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>
+                ({blockedIps.length})
+              </span>
+            )}
+          </span>
+        </div>
+
+        <div className={s.tableWrap}>
+          {blockedIps.length === 0 ? (
+            <div className={s.emptyState}>
+              <p>No IP addresses currently blocked</p>
+            </div>
+          ) : (
+            <table className={s.table}>
+              <thead>
+                <tr>
+                  <th>Blocked IP</th>
+                  <th>Location</th>
+                  <th>Reason</th>
+                  <th>Blocked At</th>
+                  <th>AI Recommendation</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {blockedIps.map((b, i) => {
+                  const actionClass = b.ai_insight?.action_suggested?.toLowerCase() || 'neutral';
+                  return (
+                    <tr key={i}>
+                      <td className={s.mono} style={{ color: 'var(--accent-red)' }}>{b.ip}</td>
+                      <td>
+                        <div className={s.locationCell}>
+                          <span className={s.country}>{b.country || 'Unknown'}</span>
+                          <span className={s.city}>{b.city || 'Unknown'}</span>
+                        </div>
+                      </td>
+                      <td>{b.reason || 'Manual Block'}</td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                        {b.blocked_at ? new Date(b.blocked_at).toLocaleString() : '—'}
+                      </td>
+                      <td>
+                        {b.ai_insight ? (
+                          <div className={s.aiBadge}>
+                            <span className={`${s.aiRecText} ${s[actionClass]}`}>
+                              {b.ai_insight.recommendation}
+                            </span>
+                            <p className={s.aiReasoning}>{b.ai_insight.reasoning}</p>
+                            <span className={s.aiSub}>
+                              Confidence: {(b.ai_insight.confidence * 100).toFixed(0)}% | 
+                              Avg Score: {b.ai_insight.avg_threat_score}%
+                            </span>
+                          </div>
+                        ) : (
+                          <span className={s.textMuted}>Processing...</span>
+                        )}
+                      </td>
+                      <td>
+                        <button className={s.unblockBtn} onClick={() => unblockIP(b.ip)}>
+                          Unblock
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
       {/* Footer */}
       <footer className={s.footer}>
         <span>CyberGuard - AI Network Threat Intelligence Platform</span>
         <span className={s.footerVersion}>v1.0.0</span>
       </footer>
+
+      {/* Settings Modal */}
+      {isSettingsOpen && (
+        <div className={s.modalOverlay} onClick={() => setIsSettingsOpen(false)}>
+          <div className={s.settingsModal} onClick={e => e.stopPropagation()}>
+            <div className={s.modalHeader}>
+              <h3>System Settings</h3>
+              <button className={s.closeBtn} onClick={() => setIsSettingsOpen(false)}>&times;</button>
+            </div>
+            <div className={s.modalBody}>
+              <div className={s.settingGroup}>
+                <label>Discord Webhook URL</label>
+                <div className={s.inputRow}>
+                  <input 
+                    type="text" 
+                    className={s.settingsInput}
+                    value={webhookUrl} 
+                    onChange={(e) => setWebhookUrl(e.target.value)}
+                    placeholder="https://discord.com/api/webhooks/..."
+                  />
+                  <button onClick={saveSettings} className={s.saveBtn}>Save</button>
+                </div>
+                <p className={s.helpText}>Notifications will be sent for critical threats and autonomous recovery.</p>
+              </div>
+              <div className={s.testSection}>
+                <button 
+                  onClick={testWebhook} 
+                  disabled={isTestLoading || !webhookUrl}
+                  className={s.testBtn}
+                >
+                  {isTestLoading ? 'Sending...' : 'Send Test Notification'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

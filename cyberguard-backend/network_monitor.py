@@ -75,6 +75,14 @@ class SimulatedMonitor:
             self._packet_buffer.clear()
             return packets
 
+    def inject_packets(self, packets):
+        """Programmatically inject packets into the monitor buffer."""
+        with self._lock:
+            if isinstance(packets, list):
+                self._packet_buffer.extend(packets)
+            else:
+                self._packet_buffer.append(packets)
+
     def _generate_loop(self):
         """Continuously generate packets."""
         while self.is_running:
@@ -241,6 +249,14 @@ class LiveMonitor:
             packets = list(self._packet_buffer)
             self._packet_buffer.clear()
             return packets
+
+    def inject_packets(self, packets):
+        """Programmatically inject packets into the monitor buffer."""
+        with self._lock:
+            if isinstance(packets, list):
+                self._packet_buffer.extend(packets)
+            else:
+                self._packet_buffer.append(packets)
 
     def _monitor_loop(self):
         """Continuously poll for network connections."""
