@@ -80,7 +80,16 @@ def send_webhook_notification(title, message, color=0x3b82f6):
 # ── App Setup ──────────────────────────────────────────────────────────
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+
+# Hardened CORS for Production
+CORS(app, resources={
+    r"/*": {
+        "origins": ["*", "https://cyberguard-dashboard.vercel.app"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
+
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 logging.basicConfig(
