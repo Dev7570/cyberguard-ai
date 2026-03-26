@@ -78,7 +78,7 @@ export default function Dashboard() {
         axios.get(`${API}/health`),
         axios.get(`${API}/stats`, authHeader),
         axios.get(`${API}/threats?limit=${filter === 'ALL' ? 100 : 50}${filter !== 'ALL' ? `&level=${filter}` : ''}`),
-        axios.get(`${API}/blocked`, authHeader).catch(() => ({ data: { blocked_ips: [] } })),
+        axios.get(`${API}/blocked`, authHeader).catch(() => ({ data: [] })),
         axios.get(`${API}/countries/blocked`, authHeader).catch(() => ({ data: [] })),
         axios.get(`${API}/settings`, authHeader).catch(() => ({ data: {} })),
         axios.get(`${API}/threats/summary`).catch(() => ({ data: null }))
@@ -87,7 +87,7 @@ export default function Dashboard() {
       setConnected(healthRes.status === 200);
       setStats(statsRes.data);
       setThreats(threatsRes.data);
-      setBlockedIps(blockedIpsRes.data.blocked_ips || []);
+      setBlockedIps(blockedIpsRes.data || []);
       setBlockedCountries(blockedCountriesRes.data);
       setWebhookUrl(settingsRes.data.webhook_url || '');
       setAnalyticsData(analyticsRes.data);
@@ -572,7 +572,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <SimulationPanel onSuccess={showAlert} />
+      <SimulationPanel onSuccess={showAlert} onError={showAlert} />
 
       {/* Threat Table */}
       <div className={s.tableCard}>
